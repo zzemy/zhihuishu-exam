@@ -16,7 +16,7 @@ metadata:
 ## 0. 前提
 
 - 需要一个**已登录**的智慧树课程页标签页（URL 形如 `https://h5.zhihuishu.com/...` 或课程「学习」页），页面上有作业列表（`.homework-test-content-item`）。
-- 另一个标签页专门用来跑试卷（`examloop.zhihuishu.com`），脚本用 `location.href` 直接导航，不要依赖「去完成」按钮开新标签（它经常不开）。
+- 另一个标签页专门用来跑试卷（`examloop.zhihuishu.com`）：脚本用 `location.href` 直接导航，不依赖「去完成」按钮打开新页签。
 - 所有脚本都通过 `run_skill` 调用，需要 `tabId`。
 
 ## 1. 安装拦截器（一次即可）

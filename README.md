@@ -1,46 +1,50 @@
 # zhihuishu-exam
 
-给浏览器助手 Cebian 用的 skill：自动完成智慧树（zhihuishu.com / examloop.zhihuishu.com）课程里的课前、课后作业。
+智慧树（zhihuishu.com / examloop.zhihuishu.com）课程中课前、课后作业的自动化作答工具，以 skill 包形式提供：`SKILL.md` 写规则，`scripts/` 放脚本。
 
-> 仅用于个人学习与自测，请遵守所在课程与平台的学术规范。
+## 免责声明
 
-## 覆盖流程
+本项目是浏览器自动化方向的个人练习与学习记录，仅适合用于自学、复习自测与前端技术研究。
 
-1. 从课程页拿作业清单（哪些还没完成）；
-2. 开卷（拿到 `paperId` 才进得去答题页）；
+把它用于任何计入成绩的作业、测验或考试，通常违反所在学校与课程的学术规范，也可能违反平台的服务条款。请在使用前确认自己的行为是否被允许；由此产生的一切后果由使用者自行承担，作者不对任何滥用行为负责。
+
+## 流程
+
+1. 读取课程页的作业清单，确定哪些尚未完成；
+2. 开卷：点「去完成」触发 `start-pull-paper` 请求，从响应里取 `paperId`；
 3. 逐题作答：单选题点选项，问答题写进 CKEditor；
-4. 提交作业，并在确认框点「确定」；
+4. 提交作业，并在确认弹窗点「确定」；
 5. 回课程页核对每份作业的成绩。
 
 ## 安装
 
-整个目录放进 `~/.cebian/skills/zhihuishu-exam/` 即可：
+仓库结构本身就是一个完整的 skill 包（顶层 `SKILL.md` + `scripts/`）。把它整个放进宿主运行的 skills 目录，目录名保持 `zhihuishu-exam` 即可：
 
 ```bash
-git clone https://github.com/zzemy/zhihuishu-exam.git ~/.cebian/skills/zhihuishu-exam
+git clone https://github.com/zzemy/zhihuishu-exam.git
 ```
 
 ## 脚本
 
-| 脚本 | 作用 |
-| --- | --- |
-| `scripts/hook-api.js` | 挂钩接口，抓 `taskList`（作业清单）等响应 |
-| `scripts/list-tasks.js` | 列作业：未完成 / 已完成 + 成绩 |
-| `scripts/start-exam.js` | 开卷，拿 `paperId` |
-| `scripts/open-exam.js` | 打开答题页（必须带 `?examPaperId=`） |
-| `scripts/question.js` | 读当前题：题干、题型、图片、选项 |
-| `scripts/pick-option.js` | 点单选题选项 |
-| `scripts/fill-essay.js` | 把答案写进 CKEditor |
-| `scripts/submit.js` | 提交作业 + 确认 |
-| `scripts/verify.js` | 核对已提交作业的成绩 |
+| 脚本 | 参数 | 作用 |
+| --- | --- | --- |
+| `scripts/hook-api.js` | 无 | 安装 fetch / XHR 拦截器，缓存关键请求体与响应到 `window.__zsk` |
+| `scripts/list-tasks.js` | 无 | 复现最近一次被捕获的 `taskList` 请求，返回作业任务列表 |
+| `scripts/start-exam.js` | `{ index }` | 点课程页第 index 个任务的「去完成」，取回 `paperId` |
+| `scripts/open-exam.js` | `{ examTestId, examId, paperId, courseId }` | 导航到答题页 |
+| `scripts/question.js` | 无 | 读取当前题目：题号、题型、题目图片、选项、进度、导航按钮文案 |
+| `scripts/pick-option.js` | `{ letter }` | 选中当前单选题的某个选项 |
+| `scripts/fill-essay.js` | `{ html }` 或 `{ text }`（后者自动转段落） | 把答案写入 CKEditor |
+| `scripts/submit.js` | `{ force }`，默认要求答题进度 100% | 提交作业并确认 |
+| `scripts/verify.js` | 无 | 查询该试卷的批阅状态、总分与每题得分 |
 
-## 已经替你踩掉的坑
+## 实现说明
 
-- 答题页 URL 不带 `?examPaperId=` 会是空白页。
-- 没开卷的作业，`taskList` 里 `paperId` 是 `null`——要去课程页点「去完成」，从 `start-pull-paper` 的响应里拿。
-- 编辑器是 CKEditor 5：`document.querySelector('#QuestionEssay').ckeditorInstance`，用 `setData(html)` 写入；切到下一题（失焦）时进度才会同步。
-- 提交后 AI 判分偶尔整份判错或分数异常，刷新页面即可恢复。
-- 提交后应用会把标签页跳回之前看过的某个 exam URL，属正常现象；以课程页「未完成」列表为准。
-- 已提交的卷子不要重复提交（页面上的「提交」会拿当前编辑器内容重交一遍）。
+- 答题页 URL 必须带 `?examPaperId=`，否则是空白页。
+- 未开卷的作业在任务列表里 `paperId` 为 `null`，需要先在课程页点「去完成」，从 `start-pull-paper` 的响应中获取。
+- 编辑器是 CKEditor 5：通过 `document.querySelector('#QuestionEssay').ckeditorInstance` 取实例，用 `setData(html)` 写入；切换到下一题（失焦）时进度才会同步。
+- 提交后页面会跳回上一个试卷的 URL，判断是否提交成功应以任务列表为准。
+- 评分聚合可能滞后（AI 首轮判分后总分未及时重算），稍候或刷新通常可恢复；重复提交没有意义，提交只作用于当前已加载的题目。
+- 题目正文是图片时，需对相应 `<img>` 截图后视觉读题。
 
-完整规则（接口、选择器、examState 语义）见 `SKILL.md`。
+更完整的规则（接口、选择器、`examState` 语义）见 `SKILL.md`。

@@ -9,6 +9,8 @@ metadata:
 
 # 智慧树作业自动作答与提交
 
+> 免责声明：本项目仅供个人学习、复习与技术研究使用；用于计入成绩的作业或考试通常违反学术规范，由此产生的一切后果由使用者自负。
+
 把「课程页拿任务 → 开试卷 → 逐题作答 → 提交 → 核对成绩」这条链路固化下来。题目正文是**图片**，所以读题必须走 `screenshot`（视觉），脚本只负责机械动作。
 
 ## 0. 前提
@@ -104,20 +106,20 @@ run_skill skill=zhihuishu-exam script=scripts/verify.js tabId=<试卷tab或课�
 
 选择器会随版本变，优先用 `inspect` 重新发现，不要硬套。
 
-## 踩过的坑
+## 实现要点
 
-- **题目正文是图片**，`read_page` 拿到的是空文；必须 `screenshot` 对应 `<img>` 再视觉读题。
-- **进度条不实时**：填完不切题就还是 0%/50%，别被骗。
-- **提交后平台会把你跳回上一个试卷的 URL**——别拿 URL 判断是否提交成功，用任务列表核对。
-- **评分聚合滞后**：出现过答题卡三题都 `score=5.00` 而作业总分只记 10.25 的情况（AI 首轮判分后总分未重算）。等一会儿/刷新通常会对上，不要急着重提（重提可能只提交当前已加载的题目）。
-- **去完成按钮经常不开新标签页**，但点它能触发 `start-pull-paper`（我们只需要响应里的 `paperId`）。
-- **答案别写得太像 AI**：用学生的口吻写成连贯的段落，不要小标题、编号列表、加粗、「解法一/解法二/注：」这类模板化结构；数学式用 `e<sup>x2</sup>` 这种简单上标即可，不必追求排版。
+- **题目正文是图片**：`read_page` 取不到文字，需对相应 `<img>` 截图后视觉读题。
+- **进度条不同步实时状态**：仅在切换题目时更新，填写过程中可能一直停在 0% / 50%。
+- **提交后页面会跳回上一个试卷的 URL**：不要以 URL 判断提交是否成功，应以任务列表为准。
+- **评分聚合可能滞后**：出现过答题卡三题均为 `score=5.00`、而作业总分只记 10.25 的情况（AI 首轮判分后总分未重算）。稍候或刷新通常可恢复；重复提交没有意义（提交只作用于当前已加载的题目）。
+- **「去完成」按钮通常不会打开新标签页**：但点击会触发 `start-pull-paper` 请求，从响应中取 `paperId` 即可。
+- **作答风格**：以学生的口吻写成连贯段落，不使用小标题、编号列表、加粗或「解法一 / 解法二 / 注：」这类模板化结构；数学式用 `e<sup>x2</sup>` 这样的简单上标即可。
 
-## 维护说明（改脚本前先看）
+## 维护说明
 
-- 脚本用 `module.exports = <值>` 返回结果，内部可以自由用顶层 `await`。
-- `executeInPage(code)` 会把 `code` 包进一个 **async 函数体**执行：所以注入代码必须用**顶层 `return`** 返回值；写成 `(() => { return x })()` 这种 IIFE 只会拿到 `(no return value)`。
-- `executeInPage` 的返回值是**字符串**（对象被 JSON 序列化），所以脚本里统一 `let out = raw; try { out = JSON.parse(raw); } catch (e) {}`。
-- 注入代码里的反斜杠用 `String.raw` 模板字符串写，避免被模板字面量吃掉。
-- 权限必须写在 SKILL.md front matter 的 `metadata.permissions` 下（`page.executeJs` 才会提供 `executeInPage`）；写在外层 `permissions:` 不生效。
-- 脚本要幂等：重复执行 hook-api.js 返回 `already` 是正常的。
+- 脚本用 `module.exports = <值>` 返回结果，内部可以使用顶层 `await`。
+- `executeInPage(code)` 会把 `code` 包进 **async 函数体**执行：注入代码必须用**顶层 `return`** 返回值；写成 `(() => { return x })()` 这类 IIFE 只会得到 `(no return value)`。
+- `executeInPage` 的返回值是**字符串**（对象被 JSON 序列化），脚本内统一 `let out = raw; try { out = JSON.parse(raw); } catch (e) {}`。
+- 注入代码中的反斜杠用 `String.raw` 模板字符串书写，避免被模板字面量转义。
+- 权限需写在 SKILL.md front matter 的 `metadata.permissions` 下（`page.executeJs` 才会提供 `executeInPage`）；写在外层 `permissions:` 不生效。
+- 脚本保持幂等：重复执行 `hook-api.js` 返回 `already` 属正常现象。
